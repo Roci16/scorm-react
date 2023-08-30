@@ -16,7 +16,7 @@ const Items = ({ courseId, }) => {
     const [items, setItems] = useState([]);
     const [title, setTitle] = useState('');
     const [isLoading, setIsLoading] = useState(true)
-
+    // const [popupOpen, setPopupOpen] = useState(false);
     const [cmiData, setCmiData] = useState({})
 
     const baseURL = `/api/cursos`
@@ -27,21 +27,56 @@ const Items = ({ courseId, }) => {
     const getResourceByItem = (resourceId) =>
         courseData.resources.resource.filter((r) => r.identifier === resourceId)[0];
 
-    //Inicializar Scorm
-    let settings = {
-        autocommit: true,
-        autocommitSeconds: 5,
-        logLevel: 4,
-        alwaysSendTotalTime: true
-    }
-    let x;
 
-    // eslint-disable-next-line no-undef
-    x = window.API = new Scorm12API(settings);
-    
-    x.on("LMSInitialize", function () {
-        console.log("LMSInitialize")
-    });
+    // useEffect(() => {
+    //     //Inicializar Scorm
+    //     let settings = {
+    //         autocommit: true,
+    //         autocommitSeconds: 5,
+    //         logLevel: 4,
+    //         alwaysSendTotalTime: true
+    //     }
+    //     // let x;
+
+    //     // eslint-disable-next-line no-undef
+    //     window.API = new Scorm12API(settings);
+
+    //     window.API.on("LMSInitialize", function () {
+    //         console.log("LMSInitialize")
+    //     });
+
+
+    //     // // const usersCMI = cmiData;
+    //     // const usersCMI = localStorage.getItem("cmi");
+    //     // if (usersCMI) {
+    //     //     window.API.loadFromJSON(JSON.parse(usersCMI).cmi);
+    //     // }
+
+    //     window.API.on('LMSSetValue.cmi.*', async function (CMIElement, value) {
+    //         window.API.storeData(true);
+    //         // localStorage.setItem('cmi', JSON.stringify(window.API.renderCommitCMI(true)));
+
+    //         const dataToSend = {
+    //             cmi: window.API.renderCommitCMI(true)
+    //         };
+
+    //         const response = await fetch(`/api/cursos/actualizarProgreso/${idCurso}`, {
+    //             method: 'POST',
+    //             headers: {
+    //                 'Content-Type': 'application/json'
+    //             },
+    //             body: JSON.stringify(dataToSend)
+    //         });
+
+    //         if (response.ok) {
+    //             console.log('Datos enviados exitosamente.');
+    //         } else {
+    //             console.error('Error al enviar los datos.');
+    //         }
+    //     });
+
+    // }, [idCurso])
+
 
     //Render Items
     function renderItems(items) {
@@ -103,6 +138,123 @@ const Items = ({ courseId, }) => {
     }, [courseData]);
 
 
+    useEffect(() => {
+        // Obtener el progreso inicial del servidor
+        const fetchProgress = async () => {
+            try {
+                const response = await fetch(`${baseURL}/progreso/${courseId}`);
+                const data = await response.text();
+                const parsedProgress = JSON.parse(data);
+
+                // Actualizar los estados con el progreso inicial
+                setLessonStatus(parsedProgress?.cmi_core?.cmiData?.cmi?.core?.lesson_status);
+                setLessonLocation(parsedProgress?.cmi_core?.cmiData?.cmi?.core?.lesson_location);
+                setSessionTime(parsedProgress?.cmi_core?.cmiData?.cmi?.core?.session_time);
+                setTotalTime(parsedProgress?.cmi_core?.cmiData?.cmi?.core?.total_time);
+                setObjectives(parsedProgress?.cmi_core?.cmiData?.cmi?.core?.objectives);
+
+                console.log(lessonStatus)
+                console.log(lessonLocation)
+                console.log(sessionTime)
+                console.log(totalTime)
+                console.log(objectives)
+
+                if (window.API && parsedProgress?.cmi_core?.cmiData?.cmi) {
+                    window.API.loadFromJSON(parsedProgress.cmi_core.cmiData.cmi);
+                    // console.log(parsedProgress.cmi_core.cmiData)
+                }
+            } catch (error) {
+                console.error('Error fetching progress:', error);
+            }
+        };
+
+        fetchProgress();
+    }, [courseId]);
+
+    useEffect(() => {
+        //Inicializar Scorm
+        let settings = {
+            autocommit: true,
+            autocommitSeconds: 5,
+            logLevel: 4,
+            alwaysSendTotalTime: true
+        }
+        // let x;
+
+        // eslint-disable-next-line no-undef
+        window.API = new Scorm12API(settings);
+
+        window.API.on("LMSInitialize", function () {
+            // console.log("LMSInitialize")
+        });
+
+        window.API.on('LMSSetValue.cmi.*', async function (CMIElement, value) {
+            window.API.storeData(true);
+
+            const dataToSend = {
+                cmiData: window.API.renderCommitCMI(true)
+            };
+
+            const response = await fetch(`/api/cursos/actualizarProgreso/${courseId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(dataToSend)
+            });
+
+            if (response.ok) {
+                console.log('Datos enviados exitosamente.');
+                // console.log("Post: ", dataToSend)
+                // progresoCmi();
+            } else {
+                console.error('Error al enviar los datos.');
+            }
+        });
+
+    }, [])
+
+
+    //////////////////////////////////
+    ///Ventana emergente//////////////
+
+    //     const openPopup = () => {
+    //         setPopupOpen(true);
+    //     };
+    //     useEffect(() => {
+    //         if (popupOpen) {
+    //             const width = 800;
+    //             const height = 600;
+    //             const left = (window.innerWidth - width) / 2;
+    //             const top = (window.innerHeight - height) / 2;
+
+    //             window.open(resource, '_blank', `width=${width}, height=${height}, left=${left}, top=${top}`);
+
+    //             setPopupOpen(false);
+    //         }
+    //     }, [popupOpen, resource]);
+
+
+    // const progresoCmi = async () => {
+    //     try {
+    //         const response = await fetch(`${baseURL}/progreso/${courseId}`);
+    //         const data = await response.text();
+    //         const parsedDataProgreso = JSON.parse(data);
+
+    //         setCmiData(parsedDataProgreso);
+
+    //         // Acceder al valor de lesson_status
+    //         const lessonStatusValue = parsedDataProgreso?.cmi_core?.cmiData?.cmi?.core?.lesson_status;
+    //         console.log("Valor de lesson_status:", lessonStatusValue);
+    //         setLessonStatus(lessonStatusValue)
+    //         // console.log(parsedDataProgreso);
+    //     } catch (error) {
+    //         console.error('Error:', error);
+    //     }
+    // };
+
+
+
     return (
         <div className="container">
             {isLoading ? (
@@ -130,6 +282,7 @@ const Items = ({ courseId, }) => {
                         ></iframe>
                     </div>
                     <div>
+                        {/* <button onClick={() => openPopup(resource)}>Ventana Emergente</button> */}
                         {/* 
                         <p>Lesson Status: {lessonStatus}</p>
                         <p>Tiempo en Sesión Activa: {sessionTime}</p>

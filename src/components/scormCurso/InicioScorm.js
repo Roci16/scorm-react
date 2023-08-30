@@ -11,6 +11,8 @@ const InicioScorm = () => {
     const [activeCollapse, setActiveCollapse] = useState('');
     const [courses, setCourses] = useState([]);
     const progressVariant = lesson_status === "incomplete" ? "danger" : "success";
+    const [lessonStatusMap, setLessonStatusMap] = useState({}); // Mapa de lesson_status por courseId
+
 
     // const url = "http://autoservicio-scorm-dev.us-east-1.elasticbeanstalk.com/api/cursos"
     const url = "/api/cursos"
@@ -30,7 +32,7 @@ const InicioScorm = () => {
     }, []);
 
 
-     const handleCollapse = (courseId) => {
+    const handleCollapse = (courseId) => {
         // console.log(courseId)
         setActiveCollapse(courseId === activeCollapse ? '' : courseId);
     };
@@ -45,25 +47,34 @@ const InicioScorm = () => {
 
     const now = calculateProgress();
 
+    const progresoCmi = async (courseId) => {
+        try {
+            const response = await fetch(`${url}/progreso/${courseId}`);
+            const data = await response.text();
+            const parsedDataProgreso = JSON.parse(data);
+            const lessonStatusValue =
+                parsedDataProgreso?.cmi_core?.cmiData?.cmi?.core?.lesson_status;
+            // console.log(lessonStatusValue)
+            return lessonStatusValue;
+
+        } catch (error) {
+            // console.error('Error:', error);
+        }
+    };
+
     useEffect(() => {
-        
-        // const scorm = initializeScorm();
-
-        
-    //     const scorm = () =>{
-    //         if (typeof window == "undefined") return;
-    
-    //         // Configuramos scorm-again
-    //       const API = new Scorm12API({
-    //             autocommit: true,
-    //             autocommitSeconds: 5,
-    //             logLevel: 4,
-    //             alwaysSendTotalTime: true
-    //         });
-    //     }
-    //    scorm()
-    }, []);
-
+        // Obtener el progreso de todos los cursos
+        const fetchLessonStatuses = async () => {
+            const lessonStatuses = {};
+            for (const course of courses) {
+                const lessonStatus = await progresoCmi(course.id);
+                lessonStatuses[course.id] = lessonStatus || "incomplete";
+            }
+            // console.log(lessonStatuses)
+            setLessonStatusMap(lessonStatuses);
+        };
+        fetchLessonStatuses();
+    }, [courses]);
 
     return (
         <div>
@@ -99,10 +110,26 @@ const InicioScorm = () => {
                                     {course.name}
                                 </h2>
                                 <div className="collapse-progressbar">
-                                    <ProgressBar now={now} label={lesson_status === "incomplete" ? "0%" : `${now}%`} className="progressbar" variant={progressVariant} />
+                                    {/* <ProgressBar now={now} label={lesson_status === "incomplete" ? "0%" : `${now}%`} className="progressbar" variant={progressVariant} /> */}
+                                    <ProgressBar
+                                        now={calculateProgress(lessonStatusMap[course.id])}
+                                        label={
+                                            lessonStatusMap[course.id] === "incomplete"
+                                                ? "0%"
+                                                // : "100%" 
+                                                : `${now}%`
+                                        }
+                                        className="progressbar"
+                                        variant=
+                                        {
+                                            lessonStatusMap[course.id] === "incomplete"
+                                                ? "danger"
+                                                : progressVariant
+                                        }
+                                    />
                                     <i
-                                     className="fa fa-chevron-down fs-4"
-                                     aria-hidden="true"></i>
+                                        className="fa fa-chevron-down fs-4"
+                                        aria-hidden="true"></i>
                                 </div>
                             </div>
                             <div className="course-description">
